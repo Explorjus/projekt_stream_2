@@ -6,26 +6,41 @@ st.write("Witaj w yt_downloader")
 
 link = st.text_input("Wklej link")
 
-# !!! WYBIERZ SWOJĄ PRZEGLĄDARKĘ !!!
-# Dostępne opcje: 'chrome', 'safari', 'firefox', 'edge', 'brave'
-MOJA_PRZEGLADARKA = ['chrome', 'safari'] 
+# Lista przeglądarek, które program przetestuje po kolei
+LISTA_PRZEGLADAREK = ['chrome', 'safari', 'firefox', 'edge'] 
 
 nazwa_pliku = None
 
+# Zmienna pomocnicza, w której zapiszemy przeglądarkę, która zadziałała
+if 'dzialajaca_przegladarka' not in st.session_state:
+    st.session_state.dzialajaca_przegladarka = None
+
 if link:
-    try:
-        opcje_info = {
-            'extractor_args': {'youtube': {'player_client': ['web', 'ios']}},
-            # PRZEKAZUJEMY CIASTECZKA DO SPRAWDZENIA INFO
-            'cookiesfrombrowser': (MOJA_PRZEGLADARKA,), 
-        }
-        with yt_dlp.YoutubeDL(opcje_info) as ydl:
-            info = ydl.extract_info(link, download=False)
-            tytul_filmu = info.get('title', 'video')
-            bezpieczny_tytul = "".join([c for c in tytul_filmu if c.isalpha() or c.isdigit() or c==' ']).rstrip()
-            nazwa_pliku = f"{bezpieczny_tytul}.mp4"
-    except Exception as e:
-        st.error(f"Nie udało się pobrać informacji o filmie: {e}")
+    info = None
+    # Pętla for przechodzi po kolei przez każdą przeglądarkę z listy
+    for przegladarka in LISTA_PRZEGLADAREK:
+        try:
+            opcje_info = {
+                'extractor_args': {'youtube': {'player_client': ['web', 'ios']}},
+                # Przekazujemy pojedynczy tekst w krotce, np. ('chrome',)
+                'cookiesfrombrowser': (przegladarka,), 
+            }
+            with yt_dlp.YoutubeDL(opcje_info) as ydl:
+                info = ydl.extract_info(link, download=False)
+                tytul_filmu = info.get('title', 'video')
+                bezpieczny_tytul = "".join([c for c in tytul_filmu if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                nazwa_pliku = f"{bezpieczny_tytul}.mp4"
+                
+                # Sukces! Zapisujemy, która przeglądarka zadziałała i przerywamy pętlę
+                st.session_state.dzialajaca_przegladarka = przegladarka
+                break
+        except Exception:
+            # Jeśli ta przeglądarka wywali błąd, ignorujemy go i pętla idzie do następnej
+            continue
+
+    # Jeśli pętla się skończyła, a zmienna 'info' dalej jest pusta, to znaczy że żadna przeglądarka nie zadziałała
+    if not info:
+        st.error("Nie udało się pobrać informacji o filmie. Żadna z przeglądarek nie dostarczyła poprawnych ciasteczek. Upewnij się, że jesteś zalogowany na YouTube w Chrome lub Safari.")
         st.stop()
 
 if 'pobrane' not in st.session_state:
@@ -36,19 +51,21 @@ if st.button("Przygotuj film do pobrania"):
         st.warning("Wklej link najpierw")
     else:
         with st.spinner("Pobieranie i przygotowywanie... Może to chwilę potrwać."):
+            # Używamy tej przeglądarki, która zadziałała w kroku powyżej
+            uzyj_przegladarki = st.session_state.dzialajaca_przegladarka
+            
             ustawienia = {
                 'format': 'best',
                 'outtmpl': nazwa_pliku,
                 'extractor_args': {'youtube': {'player_client': ['web', 'mweb', 'ios']}},
                 'nocheckcertificate': True,
-                # PRZEKAZUJEMY CIASTECZKA DO WŁAŚCIWEGO POBIERANIA
-                'cookiesfrombrowser': (MOJA_PRZEGLADARKA,), 
+                'cookiesfrombrowser': (uzyj_przegladarki,), 
             }
             try:
                 with yt_dlp.YoutubeDL(ustawienia) as pobieranie:
                     pobieranie.download([link])
                 st.session_state.pobrane = True
-                st.success("Film jest gotowy do pobrania na Twój komputer!")
+                st.success(f"Film przygotowany przy użyciu ciasteczek z: {uzyj_przegladarki}!")
             except Exception as e:
                 st.error(f"Wystąpił błąd podczas pobierania: {e}")
                 st.session_state.pobrane = False
