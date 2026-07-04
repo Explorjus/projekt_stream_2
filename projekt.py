@@ -1,11 +1,27 @@
 import streamlit as st
+import yt_dlp
+import os
 
-st.title("Hello world")
+st.write("Witaj w yt_downloader")
+link = st.text_input("Wklej link")
 
-st.write("siema")
+if st.button("Pobierz film"):
+    if link:
+        st.write("Pobieranie...")
+        ustawienia = {
+            'format': 'best',
+            'outtmpl': '%(title)s.%(ext)s',
+        }
 
-st.badge("elo")
+        try:
+            with yt_dlp.YoutubeDL(ustawienia) as pobieranie:
+                pobieranie.download([link])
+            st.success("Film pobrano")
+        except Exception as e:
+            st.error(f"Wystąpił błąd: {str(e)}")
+    else:
+        st.warning("Wklej poprawny link")
 
-klik = st.button("witaj")
-if klik == True:
-    st.write("elo")
+
+
+
